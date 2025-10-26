@@ -28,6 +28,7 @@ from werkzeug.security import check_password_hash, generate_password_hash
 
 from api import settings
 from api.apps.auth import get_auth_client
+from api.apps.auth.ad import ADClient
 from api.db import FileType, UserTenantRole
 from api.db.db_models import TenantLLM
 from api.db.services.file_service import FileService
@@ -135,6 +136,121 @@ def login():
             data=False,
             code=settings.RetCode.AUTHENTICATION_ERROR,
             message="Email and password do not match!",
+        )
+
+
+@manager.route("/login/ad", methods=["POST"])  # noqa: F821
+def ad_login():
+    """
+    AD authentication endpoint.
+    ---
+    tags:
+      - User
+    parameters:
+      - in: body
+        name: body
+        description: AD Login credentials.
+        required: true
+        schema:
+          type: object
+          properties:
+            username:
+              type: string
+              description: AD username.
+            password:
+              type: string
+              description: AD password.
+    responses:
+      200:
+        description: AD login successful.
+        schema:
+          type: object
+      401:
+        description: AD authentication failed.
+        schema:
+          type: object
+    """
+    if not request.json:
+        return get_json_result(data=False, code=settings.RetCode.AUTHENTICATION_ERROR, message="Unauthorized!")
+    
+    username = request.json.get("username", "")
+    password = request.json.get("password", "")
+    
+    if not username or not password:
+        return get_json_result(
+            data=False,
+            code=settings.RetCode.AUTHENTICATION_ERROR,
+            message="Username and password are required!",
+        )
+    
+    # Get AD configuration
+    ad_config = settings.AD_CONFIG
+    if not ad_config:
+        return get_json_result(
+            data=False,
+            code=settings.RetCode.AUTHENTICATION_ERROR,
+            message="AD authentication is not configured!",
+        )
+    
+    try:
+        # Create AD client
+        ad_client = ADClient(ad_config)
+        
+        # Authenticate user against AD
+        if not ad_client.authenticate_user(username, password):
+            return get_json_result(
+                data=False,
+                code=settings.RetCode.AUTHENTICATION_ERROR,
+                message="AD authentication failed!",
+            )
+        
+        # Get user info from AD
+        user_info = ad_client.get_user_info(username)
+        if not user_info:
+            return get_json_result(
+                data=False,
+                code=settings.RetCode.AUTHENTICATION_ERROR,
+                message="Could not retrieve user information from AD!",
+            )
+        
+        email = user_info.get("email", "")
+        if not email:
+            return get_json_result(
+                data=False,
+                code=settings.RetCode.AUTHENTICATION_ERROR,
+                message="User email not found in AD!",
+            )
+        
+        # Create or update user from AD information
+        user = UserService.create_or_update_ad_user(user_info)
+        if not user:
+            return get_json_result(
+                data=False,
+                code=settings.RetCode.AUTHENTICATION_ERROR,
+                message="Failed to create or update user!",
+            )
+        
+        # Get AD groups and assign to tenants
+        ad_groups = user_info.get("groups", [])
+        UserService.assign_user_to_tenants_from_ad_groups(user.id, ad_groups)
+        
+        # Update access token and login user
+        user.access_token = get_uuid()
+        login_user(user)
+        user.update_time = current_timestamp()
+        user.update_date = datetime_format(datetime.now())
+        user.save()
+        
+        response_data = user.to_json()
+        msg = f"Welcome back via AD, {user.nickname}!"
+        return construct_response(data=response_data, auth=user.get_id(), message=msg)
+        
+    except Exception as e:
+        logging.exception(e)
+        return get_json_result(
+            data=False,
+            code=settings.RetCode.AUTHENTICATION_ERROR,
+            message=f"AD authentication error: {str(e)}",
         )
 
 

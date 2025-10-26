@@ -60,6 +60,7 @@ HTTP_APP_KEY = None
 GITHUB_OAUTH = None
 FEISHU_OAUTH = None
 OAUTH_CONFIG = None
+AD_CONFIG = None
 DOC_ENGINE = None
 docStoreConn = None
 
@@ -155,7 +156,7 @@ def init_settings():
 
     SECRET_KEY = get_or_create_secret_key()
 
-    global AUTHENTICATION_CONF, CLIENT_AUTHENTICATION, HTTP_APP_KEY, GITHUB_OAUTH, FEISHU_OAUTH, OAUTH_CONFIG
+    global AUTHENTICATION_CONF, CLIENT_AUTHENTICATION, HTTP_APP_KEY, GITHUB_OAUTH, FEISHU_OAUTH, OAUTH_CONFIG, AD_CONFIG
     # authentication
     AUTHENTICATION_CONF = get_base_config("authentication", {})
 
@@ -166,6 +167,7 @@ def init_settings():
     FEISHU_OAUTH = get_base_config("oauth", {}).get("feishu")
 
     OAUTH_CONFIG = get_base_config("oauth", {})
+    AD_CONFIG = get_base_config("ad", {})
 
     global DOC_ENGINE, docStoreConn, retriever, kg_retriever
     DOC_ENGINE = os.environ.get("DOC_ENGINE", "elasticsearch")

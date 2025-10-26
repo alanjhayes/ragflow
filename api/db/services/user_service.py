@@ -27,6 +27,7 @@ from api.db.services.common_service import CommonService
 from api.utils import get_uuid, current_timestamp, datetime_format
 from api.db import StatusEnum
 from rag.settings import MINIO
+from .ad_service import ADGroupMappingService
 
 
 class UserService(CommonService):
@@ -162,6 +163,97 @@ class UserService(CommonService):
     def get_all_users(cls):
         users = cls.model.select()
         return list(users)
+
+    @classmethod
+    @DB.connection_context()
+    def create_or_update_ad_user(cls, user_info):
+        """
+        Create or update a user from AD authentication.
+        
+        Args:
+            user_info: Dictionary containing user information from AD
+            
+        Returns:
+            User object
+        """
+        email = user_info.get('email', '')
+        nickname = user_info.get('nickname', '')
+        username = user_info.get('username', '')
+        
+        # Check if user already exists
+        users = cls.query(email=email)
+        
+        if users:
+            # Update existing user
+            user = users[0]
+            update_data = {
+                'nickname': nickname,
+                'login_channel': 'ad'
+            }
+            
+            # Update avatar if provided
+            if 'avatar' in user_info and user_info['avatar']:
+                update_data['avatar'] = user_info['avatar']
+            
+            cls.update_by_id(user.id, update_data)
+            return user
+        else:
+            # Create new user
+            user_id = get_uuid()
+            user_data = {
+                "id": user_id,
+                "access_token": get_uuid(),
+                "email": email,
+                "nickname": nickname,
+                "login_channel": "ad",
+                "last_login_time": datetime_format(datetime.now()),
+                "is_superuser": False,
+            }
+            
+            # Add avatar if provided
+            if 'avatar' in user_info and user_info['avatar']:
+                user_data['avatar'] = user_info['avatar']
+            
+            # Create user and default tenant
+            from .user_service import TenantService, UserTenantService
+            tenant = {
+                "id": user_id,
+                "name": f"{nickname}'s Kingdom",
+                "llm_id": "default",
+                "embd_id": "default", 
+                "asr_id": "default",
+                "parser_ids": "default",
+                "img2txt_id": "default",
+                "rerank_id": "default",
+            }
+            
+            usr_tenant = {
+                "tenant_id": user_id,
+                "user_id": user_id,
+                "invited_by": user_id,
+                "role": UserTenantRole.OWNER,
+            }
+            
+            # Save user, tenant, and user-tenant relationship
+            cls.insert(**user_data)
+            TenantService.insert(**tenant)
+            UserTenantService.insert(**usr_tenant)
+            
+            # Get and return the created user
+            created_users = cls.query(email=email)
+            return created_users[0] if created_users else None
+
+    @classmethod
+    @DB.connection_context()
+    def assign_user_to_tenants_from_ad_groups(cls, user_id: str, ad_groups: list):
+        """
+        Assign a user to tenants based on their AD group memberships.
+        
+        Args:
+            user_id: ID of the user to assign
+            ad_groups: List of AD group names the user belongs to
+        """
+        ADGroupMappingService.map_ad_groups_to_tenants(user_id, ad_groups)
 
 
 class TenantService(CommonService):
