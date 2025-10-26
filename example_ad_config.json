@@ -1,0 +1,30 @@
+# Example AD Configuration
+# This would typically be in conf/config.json or environment variables
+
+{
+  "ad": {
+    "server_uri": "ldap://your-ad-server.company.com:389",
+    "domain": "company.com",
+    "bind_dn": "CN=Service Account,OU=Users,DC=company,DC=com",
+    "bind_password": "service_account_password",
+    "user_search_base": "DC=company,DC=com",
+    "group_search_base": "DC=company,DC=com",
+    "user_filter": "(sAMAccountName={username})",
+    "group_filter": "(member={user_dn})",
+    "auto_create_user": true,
+    "group_mappings": {
+      "RAGFlow-Admins": {
+        "tenant_id": "admin_tenant_id",
+        "role": "owner"
+      },
+      "RAGFlow-Users": {
+        "tenant_id": "user_tenant_id", 
+        "role": "normal"
+      },
+      "RAGFlow-Readers": {
+        "tenant_id": "read_tenant_id",
+        "role": "normal"
+      }
+    }
+  }
+}

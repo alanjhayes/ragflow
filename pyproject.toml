@@ -138,6 +138,7 @@ dependencies = [
     "markdownify>=1.2.0",
     "captcha>=0.7.1",
     "pip>=25.2",
+    "ldap3>=2.9.1",
 ]
 
 [dependency-groups]
