@@ -50,6 +50,7 @@ RUN --mount=type=cache,id=ragflow_apt,target=/var/cache/apt,sharing=locked \
     apt install -y libatk-bridge2.0-0 && \
     apt install -y libpython3-dev libgtk-4-1 libnss3 xdg-utils libgbm-dev && \
     apt install -y libjemalloc-dev && \
+    apt install -y libsasl2-dev libldap2-dev && \
     apt install -y python3-pip pipx nginx unzip curl wget git vim less && \
     apt install -y ghostscript
 
